@@ -3,6 +3,7 @@
 #![feature(step_by)]
 extern crate image;
 extern crate rand;
+extern crate time;
 
 use image::{
     RgbImage,
@@ -11,6 +12,7 @@ use image::{
 };
 use rand::Rng;
 use std::collections::VecDeque;
+use std::fs::create_dir_all;
 
 #[derive(Copy, Clone)]
 struct PixelData {
@@ -32,8 +34,8 @@ struct Color {
 }
 
 // TODO: pass as arguments
-const SIZE_X: u32 = 32;
-const SIZE_Y: u32 = 16;
+const SIZE_X: u32 = 64;
+const SIZE_Y: u32 = 64;
 
 fn main() {
     println!("Generating {}x{} image", SIZE_X, SIZE_Y);
@@ -41,17 +43,16 @@ fn main() {
     println!("Complete");
 }
 
-fn generate_image() {
-    let pixels = generate_pixels();
-    create_image(pixels);
-}
 
-fn generate_pixels() -> Vec<PixelData> {
+fn generate_image() -> Vec<PixelData> {
     let mut random_colors = random_colors();
     place_pixels(&mut random_colors)
 }
 
 fn place_pixels(colors: &mut VecDeque<Color>) -> Vec<PixelData> {
+    let time_string = format!("{}", time::now().to_timespec().sec);
+    create_dir_all(format!("output/{}", time_string)).unwrap();
+
     let mut pixels = vec![];
     // Pixels with at least one free neighbour
     let mut active_pixels = vec![];
@@ -59,20 +60,30 @@ fn place_pixels(colors: &mut VecDeque<Color>) -> Vec<PixelData> {
     let mut active_free_points = vec![];
 
     add_pixel(Point {x: SIZE_X / 2, y: SIZE_Y / 2}, colors.pop_front().unwrap(), &mut pixels, &mut active_pixels, &mut active_free_points);
+    create_image(&pixels, &time_string, "img0");
 
     let mut color_distance_threshold = 2;
+    let mut colors_counter = 0;
     while colors.len() > 0 {
-        println!("{}, {}, {}", colors.len(), active_pixels.len(), active_free_points.len());
         let c = colors.pop_front().unwrap();
         let best_point = *(active_free_points.iter().min_by_key(|&&p| color_distance(c, average_neighbour_color(p, &pixels))).unwrap());
         if color_distance(c, average_neighbour_color(best_point, &pixels)) <= color_distance_threshold {
             add_pixel(best_point, c, &mut pixels, &mut active_pixels, &mut active_free_points);
-            color_distance_threshold /= 4;
+            colors_counter = 0;
+            if (pixels.len() - 1) % 10 == 0 {
+                println!("{}, {}, {}", colors.len(), active_pixels.len(), active_free_points.len() - 1);
+                create_image(&pixels, &time_string, &format!("img{}",  pixels.len()));
+            }
         } else {
             colors.push_back(c);
-            color_distance_threshold *= 2;
+            colors_counter += 1;
+            if colors_counter >= colors.len() {
+                color_distance_threshold *= 2;
+                colors_counter = 0;
+            }
         }
     }
+    create_image(&pixels, &time_string, "!final");
     pixels
 }
 
@@ -94,17 +105,17 @@ fn color_distance(color1: Color, color2: Color) -> u32 {
 
 fn neighbours(point: Point) -> Vec<Point> {
     let mut neighbours = vec![];
-    for i in -1..2 {
-        for j in -1..2 {
-            let new_x = point.x as i32 + i;
-            let new_y = point.y as i32 + j;
-            if new_x >= 0 && new_x < SIZE_X as i32 && new_y >= 0 && new_y < SIZE_Y as i32 {
-                let new_point = Point {x: new_x as u32, y: new_y as u32};
-                if i != 0 || j != 0 {
-                    neighbours.push(new_point);
-                }
-            }
-        }
+    if point.y > 0 {
+        neighbours.push(Point {x: point.x, y: point.y - 1});
+    }
+    if point.x < SIZE_X - 1 {
+        neighbours.push(Point {x: point.x + 1, y: point.y});
+    }
+    if point.y < SIZE_Y - 1 {
+        neighbours.push(Point {x: point.x, y: point.y + 1});
+    }
+    if point.x > 0 {
+        neighbours.push(Point {x: point.x - 1, y: point.y});
     }
     neighbours
 }
@@ -138,7 +149,7 @@ fn random_colors() -> VecDeque<Color> {
     for r in (0..256).step_by(color_step as u32) {
         for g in (0..256).step_by(color_step as u32) {
             for b in (0..256).step_by(color_step as u32) {
-                colors.push_back(Color {r: r as u8, g: g as u8, b: b as u8});
+                colors.push_back(Color {r: r as u8, g: 0 as u8, b: 0 as u8});
             }
         }
     }
@@ -147,10 +158,10 @@ fn random_colors() -> VecDeque<Color> {
     colors
 }
 
-fn create_image(pixels: Vec<PixelData>) {
+fn create_image(pixels: &Vec<PixelData>, directory: &str, filename: &str) {
     let mut img = RgbImage::new(SIZE_X, SIZE_Y);
     for p in pixels {
         img.put_pixel(p.point.x, p.point.y, Rgb::from_channels(p.color.r, p.color.g, p.color.b, 0));
     }
-    let _ = img.save("output/img.png");
+    let _ = img.save(format!("output/{}/{}.png", directory, filename));
 }

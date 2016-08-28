@@ -6,3 +6,4 @@ authors = ["jmageau <julien.mageau@live.ca>"]
 [dependencies]
 image = "*"
 rand = "*"
+time = "*"
