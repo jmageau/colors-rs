@@ -9,16 +9,11 @@ use self::image::{
 };
 use self::rand::Rng;
 use std::collections::VecDeque;
+use std::collections::HashMap;
 use std::fs::create_dir_all;
 
 
-#[derive(Copy, Clone)]
-struct PixelData {
-    point: Point,
-    color: Color
-}
-
-#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash)]
 struct Point {
     x: u32,
     y: u32
@@ -46,33 +41,41 @@ fn random_colors(count: u32) -> VecDeque<Color> {
             }
         }
     }
-    // TODO: check tuple
     rand::thread_rng().shuffle(colors.as_mut_slices().0);
     colors
 }
 
 fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
     let time_string = format!("{}", time::now().to_timespec().sec);
-    create_dir_all(format!("output/{}", time_string)).unwrap();
+    let directory = format!("output/{}_{}x{}", time_string, size_x, size_y);
+    create_dir_all(&directory).unwrap();
+    let image_interval = size_x * size_y / 512;
 
-    let mut pixels = vec![];
-    // Free point with at least one occupied neighbour
-    let mut active_free_points : Vec<(Point, Color)> = vec![];
+    let mut pixels = HashMap::with_capacity((size_x*size_y) as usize);
+    // Pixels with at least one free neighbour
+    let mut active_pixels = HashMap::with_capacity(((size_x+size_y)*2) as usize);
 
-    add_pixel(Point {x: size_x / 2, y: size_y / 2}, colors.pop_front().unwrap(), &mut pixels, &mut active_free_points, size_x, size_y);
-    create_image(&pixels, size_x, size_y, &time_string, "img0");
+    add_pixel(Point {x: size_x / 2, y: size_y / 2}, colors.pop_front().unwrap(), &mut pixels, &mut active_pixels, size_x, size_y);
+    create_image(&pixels, size_x, size_y, &directory, "img0");
 
     let mut color_distance_threshold = 2;
     let mut colors_counter = 0;
+    let mut i = 1;
     while colors.len() > 0 {
         let color = colors.pop_front().unwrap();
-        let (best_point, best_point_average_neighbour_color) = *(active_free_points.iter().min_by_key(|&&(_,c)| color_distance(color, c)).unwrap());
-        if color_distance(color, best_point_average_neighbour_color) <= color_distance_threshold {
-            add_pixel(best_point, color, &mut pixels, &mut active_free_points, size_x, size_y);
+        let best_point = get_best_point(color, &active_pixels, color_distance_threshold);
+        if best_point.is_some() {
+            let point = *rand::thread_rng().choose(&free_neighbours(best_point.unwrap(), &pixels, size_x, size_y)).unwrap();
+            add_pixel(point, color, &mut pixels, &mut active_pixels, size_x, size_y);
             colors_counter = 0;
-            if (pixels.len() - 1) % 10 == 0 {
-                println!("{}, {}", colors.len(), active_free_points.len() - 1);
-                create_image(&pixels, size_x, size_y, &time_string, &format!("img{}",  pixels.len()));
+            if (pixels.len() as u32 - 1) % image_interval == 0 {
+                println!("{}, {}, {}", colors.len(), active_pixels.len() - 1, color_distance_threshold);
+                create_image(&pixels, size_x, size_y, &directory, &format!("img{}",  i));
+                i += 1;
+                color_distance_threshold -= 1;
+                if color_distance_threshold < 2 {
+                    color_distance_threshold = 2;
+                }
             }
         } else {
             colors.push_back(color);
@@ -83,26 +86,30 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
             }
         }
     }
-    create_image(&pixels, size_x, size_y, &time_string, "!final");
+    create_image(&pixels, size_x, size_y, &directory, "!final");
 }
 
-fn add_pixel(point: Point, color: Color, pixels: &mut Vec<PixelData>, active_free_points: &mut Vec<(Point, Color)>, size_x: u32, size_y: u32) {
-    let new_pixel = PixelData {point: point, color: color};
-    pixels.push(new_pixel);
-    active_free_points.retain(|&(p,_)| p != point);
+fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color>, active_pixels: &mut HashMap<Point, Color>, size_x: u32, size_y: u32) {
+    pixels.insert(point, color);
+    active_pixels.insert(point, color);
 
-    let mut new_active_free_points = free_neighbours(point, pixels, size_x, size_y).iter()
-        .filter(|&&np| !active_free_points.iter().any(|&(p,_)| p == np))
-        .map(|&p| (p, average_neighbour_color(p, pixels, size_x, size_y)))
+    let active_points_to_remove = active_pixels.iter().map(|(&p,_)| p)
+        .filter(|&p| free_neighbours(p, &pixels, size_x, size_y).len() == 0)
         .collect::<Vec<_>>();
-    active_free_points.append(&mut new_active_free_points);
+    for p in &active_points_to_remove {
+        active_pixels.remove(p);
+    }
 }
 
 fn color_distance(color1: Color, color2: Color) -> u32 {
     ((color2.r as i32 - color1.r as i32).pow(2) + (color2.g as i32 - color1.g as i32).pow(2) + (color2.b as i32 - color1.b as i32).pow(2)) as u32
 }
 
-fn neighbours(point: Point, size_x: u32, size_y: u32) -> Vec<Point> {
+fn get_best_point(color: Color, active_pixels: &HashMap<Point, Color>, color_distance_threshold: u32) -> Option<(Point)> {
+    active_pixels.iter().find(|&(_,&c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
+}
+
+fn free_neighbours(point: Point, pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32) -> Vec<Point> {
     let mut neighbours = vec![];
     if point.y > 0 {
         neighbours.push(Point {x: point.x, y: point.y - 1});
@@ -116,36 +123,13 @@ fn neighbours(point: Point, size_x: u32, size_y: u32) -> Vec<Point> {
     if point.x > 0 {
         neighbours.push(Point {x: point.x - 1, y: point.y});
     }
-    neighbours
+    neighbours.into_iter().filter(|p| !pixels.contains_key(p)).collect()
 }
 
-fn free_neighbours(point: Point, pixels: &Vec<PixelData>, size_x: u32, size_y: u32) -> Vec<Point> {
-    let occupied_points = pixels.into_iter().map(|p| p.point).collect::<Vec<_>>();
-    neighbours(point, size_x, size_y).into_iter()
-        .filter(|p| !occupied_points.contains(p))
-        .collect::<Vec<_>>()
-}
-
-fn occupied_neighbours(point: Point, pixels: &Vec<PixelData>, size_x: u32, size_y: u32) -> Vec<Point> {
-    let occupied_points = pixels.into_iter().map(|p| p.point).collect::<Vec<_>>();
-    neighbours(point, size_x, size_y).into_iter()
-        .filter(|p| occupied_points.contains(p))
-        .collect::<Vec<_>>()
-}
-
-fn average_neighbour_color(point: Point, pixels: &Vec<PixelData>, size_x: u32, size_y: u32) -> Color {
-    let occupied_neighbours = occupied_neighbours(point, &pixels, size_x, size_y);
-    let neighbour_pixels = pixels.into_iter().filter(|p| occupied_neighbours.contains(&p.point)).collect::<Vec<_>>();
-
-    let neighbour_count = neighbour_pixels.len() as u8;
-    let (r,g,b) = neighbour_pixels.into_iter().fold((0,0,0), |(r,g,b), &p| (r + p.color.r / neighbour_count, g + p.color.g / neighbour_count, b+p.color.b / neighbour_count));
-    Color {r: r, g: g, b: b}
-}
-
-fn create_image(pixels: &Vec<PixelData>, size_x: u32, size_y: u32, directory: &str, filename: &str) {
+fn create_image(pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32, directory: &str, filename: &str) {
     let mut img = RgbImage::new(size_x, size_y);
-    for p in pixels {
-        img.put_pixel(p.point.x, p.point.y, Rgb::from_channels(p.color.r, p.color.g, p.color.b, 0));
+    for (p,c) in pixels {
+        img.put_pixel(p.x, p.y, Rgb::from_channels(c.r, c.g, c.b, 0));
     }
-    let _ = img.save(format!("output/{}/{}.png", directory, filename));
+    let _ = img.save(format!("{}/{}.png", directory, filename));
 }

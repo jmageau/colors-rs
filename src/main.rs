@@ -1,5 +1,3 @@
-// generate multiple images to make animation, slightly different start point and same color order
-
 extern crate colors;
 use colors::image_functions::generate_image;
 
