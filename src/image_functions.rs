@@ -13,13 +13,13 @@ use std::collections::HashMap;
 use std::fs::create_dir_all;
 
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 struct Point {
     x: u32,
     y: u32
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Clone, Eq, PartialEq)]
 struct Color {
     r: u8,
     g: u8,
@@ -63,9 +63,10 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
     let mut i = 1;
     while colors.len() > 0 {
         let color = colors.pop_front().unwrap();
-        let best_point = get_best_point(color, &active_pixels, color_distance_threshold);
+        let best_point = get_best_point(&color, &active_pixels, color_distance_threshold);
         if best_point.is_some() {
-            let point = *rand::thread_rng().choose(&free_neighbours(best_point.unwrap(), &pixels, size_x, size_y)).unwrap();
+            let free_neighbours = free_neighbours(&best_point.unwrap(), &pixels, size_x, size_y);
+            let point = rand::thread_rng().choose(&free_neighbours).unwrap().clone();
             add_pixel(point, color, &mut pixels, &mut active_pixels, size_x, size_y);
             colors_counter = 0;
             if (pixels.len() as u32 - 1) % image_interval == 0 {
@@ -90,26 +91,27 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
 }
 
 fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color>, active_pixels: &mut HashMap<Point, Color>, size_x: u32, size_y: u32) {
-    pixels.insert(point, color);
+    pixels.insert(point.clone(), color.clone());
     active_pixels.insert(point, color);
 
-    let active_points_to_remove = active_pixels.iter().map(|(&p,_)| p)
-        .filter(|&p| free_neighbours(p, &pixels, size_x, size_y).len() == 0)
+    let active_points_to_remove = active_pixels.iter()
+        .map(|(p,_)| p.clone())
+        .filter(|p| free_neighbours(p, &pixels, size_x, size_y).len() == 0)
         .collect::<Vec<_>>();
     for p in &active_points_to_remove {
         active_pixels.remove(p);
     }
 }
 
-fn color_distance(color1: Color, color2: Color) -> u32 {
+fn color_distance(color1: &Color, color2: &Color) -> u32 {
     ((color2.r as i32 - color1.r as i32).pow(2) + (color2.g as i32 - color1.g as i32).pow(2) + (color2.b as i32 - color1.b as i32).pow(2)) as u32
 }
 
-fn get_best_point(color: Color, active_pixels: &HashMap<Point, Color>, color_distance_threshold: u32) -> Option<(Point)> {
-    active_pixels.iter().find(|&(_,&c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
+fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color>, color_distance_threshold: u32) -> Option<(Point)> {
+    active_pixels.iter().find(|&(_,c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
 }
 
-fn free_neighbours(point: Point, pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32) -> Vec<Point> {
+fn free_neighbours(point: &Point, pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32) -> Vec<Point> {
     let mut neighbours = vec![];
     if point.y > 0 {
         neighbours.push(Point {x: point.x, y: point.y - 1});
