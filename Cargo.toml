@@ -7,3 +7,4 @@ authors = ["jmageau <julien.mageau@live.ca>"]
 image = "*"
 rand = "*"
 time = "*"
+fnv = "*"

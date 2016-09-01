@@ -1,6 +1,7 @@
 extern crate time;
 extern crate image;
 extern crate rand;
+extern crate fnv;
 
 use self::image::{
     RgbImage,
@@ -10,6 +11,8 @@ use self::image::{
 use self::rand::Rng;
 use std::collections::VecDeque;
 use std::collections::HashMap;
+use std::hash::BuildHasherDefault;
+use self::fnv::FnvHasher;
 use std::fs::create_dir_all;
 
 
@@ -50,9 +53,9 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32, director
     create_dir_all(&directory).unwrap();
     let image_interval = size_x * size_y / 512;
 
-    let mut pixels = HashMap::with_capacity((size_x*size_y) as usize);
+    let mut pixels = HashMap::with_capacity_and_hasher((size_x*size_y) as usize, BuildHasherDefault::<FnvHasher>::default());
     // Pixels with at least one free neighbour
-    let mut active_pixels = HashMap::with_capacity(((size_x+size_y)*2) as usize);
+    let mut active_pixels = HashMap::with_capacity_and_hasher(((size_x+size_y)*2) as usize, BuildHasherDefault::<FnvHasher>::default());
 
     add_pixel(Point {x: size_x / 2, y: size_y / 2}, colors.pop_front().unwrap(), &mut pixels, &mut active_pixels, size_x, size_y);
     create_image(&pixels, size_x, size_y, &directory, "img0");
@@ -89,7 +92,7 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32, director
     create_image(&pixels, size_x, size_y, &directory, "0final");
 }
 
-fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color>, active_pixels: &mut HashMap<Point, Color>, size_x: u32, size_y: u32) {
+fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, active_pixels: &mut HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, size_x: u32, size_y: u32) {
     pixels.insert(point.clone(), color.clone());
     active_pixels.insert(point, color);
 
@@ -106,11 +109,11 @@ fn color_distance(color1: &Color, color2: &Color) -> u32 {
     ((color2.r as i32 - color1.r as i32).pow(2) + (color2.g as i32 - color1.g as i32).pow(2) + (color2.b as i32 - color1.b as i32).pow(2)) as u32
 }
 
-fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color>, color_distance_threshold: u32) -> Option<(Point)> {
+fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, color_distance_threshold: u32) -> Option<(Point)> {
     active_pixels.iter().find(|&(_,c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
 }
 
-fn free_neighbours(point: &Point, pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32) -> Vec<Point> {
+fn free_neighbours(point: &Point, pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, size_x: u32, size_y: u32) -> Vec<Point> {
     let mut neighbours = vec![];
     if point.y > 0 {
         neighbours.push(Point {x: point.x, y: point.y - 1});
@@ -127,7 +130,7 @@ fn free_neighbours(point: &Point, pixels: &HashMap<Point, Color>, size_x: u32, s
     neighbours.into_iter().filter(|p| !pixels.contains_key(p)).collect()
 }
 
-fn create_image(pixels: &HashMap<Point, Color>, size_x: u32, size_y: u32, directory: &str, filename: &str) {
+fn create_image(pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, size_x: u32, size_y: u32, directory: &str, filename: &str) {
     let mut img = RgbImage::new(size_x, size_y);
     for (p,c) in pixels {
         img.put_pixel(p.x, p.y, Rgb::from_channels(c.r, c.g, c.b, 0));
