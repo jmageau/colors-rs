@@ -26,9 +26,10 @@ struct Color {
     b: u8
 }
 
-pub fn generate_image(size_x: u32, size_y: u32) {
+
+pub fn generate_image(size_x: u32, size_y: u32, directory: &str) {
     let mut random_colors = random_colors(size_x * size_y);
-    place_pixels(&mut random_colors, size_x, size_y);
+    place_pixels(&mut random_colors, size_x, size_y, directory);
 }
 
 fn random_colors(count: u32) -> VecDeque<Color> {
@@ -45,9 +46,7 @@ fn random_colors(count: u32) -> VecDeque<Color> {
     colors
 }
 
-fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
-    let time_string = format!("{}", time::now().to_timespec().sec);
-    let directory = format!("output/{}_{}x{}", time_string, size_x, size_y);
+fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32, directory: &str) {
     create_dir_all(&directory).unwrap();
     let image_interval = size_x * size_y / 512;
 
@@ -87,7 +86,7 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32) {
             }
         }
     }
-    create_image(&pixels, size_x, size_y, &directory, "!final");
+    create_image(&pixels, size_x, size_y, &directory, "0final");
 }
 
 fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color>, active_pixels: &mut HashMap<Point, Color>, size_x: u32, size_y: u32) {
