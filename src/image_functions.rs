@@ -14,19 +14,14 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use self::fnv::FnvHasher;
 use std::fs::create_dir_all;
+use color_functions::Color;
+use color_functions::color_distance;
 
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct Point {
     x: u32,
     y: u32
-}
-
-#[derive(Clone, Eq, PartialEq)]
-struct Color {
-    r: u8,
-    g: u8,
-    b: u8
 }
 
 
@@ -41,7 +36,7 @@ fn random_colors(count: u32) -> VecDeque<Color> {
     for r in (0..256).step_by(color_step) {
         for g in (0..256).step_by(color_step) {
             for b in (0..256).step_by(color_step) {
-                colors.push_back(Color {r: (r + color_step) as u8, g: (g + color_step) as u8, b: (b + color_step) as u8});
+                colors.push_back(Color::new((r + color_step) as u8, (g + color_step) as u8, (b + color_step) as u8));
             }
         }
     }
@@ -105,11 +100,7 @@ fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color, Buil
     }
 }
 
-fn color_distance(color1: &Color, color2: &Color) -> u32 {
-    ((color2.r as i32 - color1.r as i32).pow(2) + (color2.g as i32 - color1.g as i32).pow(2) + (color2.b as i32 - color1.b as i32).pow(2)) as u32
-}
-
-fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, color_distance_threshold: u32) -> Option<(Point)> {
+fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, color_distance_threshold: u32) -> Option<Point> {
     active_pixels.iter().find(|&(_,c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
 }
 
