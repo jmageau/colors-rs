@@ -1,2 +1,5 @@
 target/
 output/
+
+.idea/
+colors.iml

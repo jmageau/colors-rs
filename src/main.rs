@@ -19,9 +19,9 @@ fn main() {
 }
 
 fn create_info_file(directory: &str, size_x: u32, size_y: u32, duration: Duration) {
-    let color_step =  (256f32 / ((size_x*size_y) as f32).cbrt()) as u16;
+    let color_step = (256f32 / ((size_x * size_y) as f32).cbrt()) as u16;
     let contents = format!("Dimensions: {}x{}\nColor step: {}\nTime to complete: {}.{} seconds",
-        size_x, size_y, color_step, duration.num_seconds(), duration.num_milliseconds());
+                           size_x, size_y, color_step, duration.num_seconds(), duration.num_milliseconds());
 
     let mut f = File::create(format!("{}/0info.txt", directory)).unwrap();
     f.write_all(contents.as_bytes()).unwrap();

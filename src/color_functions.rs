@@ -41,10 +41,10 @@ pub fn delta_e(color1: &Color, color2: &Color) -> f64 {
     let c2_ab = (color2.lab.a.powi(2) + color2.lab.b.powi(2)).sqrt();
 
     // 3
-    let c_ab = (c1_ab + c2_ab ) / 2f64;
+    let c_ab = (c1_ab + c2_ab) / 2f64;
 
     // 4
-    let g = 0.5f64 * (1f64 - (c_ab.powi(7)/(c_ab.powi(7) + 25f64.powi(7))).sqrt());
+    let g = 0.5f64 * (1f64 - (c_ab.powi(7) / (c_ab.powi(7) + 25f64.powi(7))).sqrt());
 
     // 5
     let a1_p = (1f64 + g) * color1.lab.a;
@@ -175,5 +175,5 @@ fn rgb_to_lab(r: u8, g: u8, b: u8) -> ColorLab {
     let a = (x - y) * 500f64;
     let b = (y - z) * 200f64;
 
-    ColorLab {l: l, a: a, b: b}
+    ColorLab { l: l, a: a, b: b }
 }

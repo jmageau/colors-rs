@@ -31,7 +31,7 @@ pub fn generate_image(size_x: u32, size_y: u32, directory: &str) {
 }
 
 fn random_colors(count: u32) -> VecDeque<Color> {
-    let color_step =  (256f32 / (count as f32).cbrt()) as u16;
+    let color_step = (256f32 / (count as f32).cbrt()) as u16;
     let mut colors = VecDeque::with_capacity(256 * 256 * 256 / color_step as usize);
     for r in (0..256).step_by(color_step) {
         for g in (0..256).step_by(color_step) {
@@ -48,11 +48,11 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32, director
     create_dir_all(&directory).unwrap();
     let image_interval = size_x * size_y / 512;
 
-    let mut pixels = HashMap::with_capacity_and_hasher((size_x*size_y) as usize, BuildHasherDefault::<FnvHasher>::default());
+    let mut pixels = HashMap::with_capacity_and_hasher((size_x * size_y) as usize, BuildHasherDefault::<FnvHasher>::default());
     // Pixels with at least one free neighbour
-    let mut active_pixels = HashMap::with_capacity_and_hasher(((size_x+size_y)*2) as usize, BuildHasherDefault::<FnvHasher>::default());
+    let mut active_pixels = HashMap::with_capacity_and_hasher(((size_x + size_y) * 2) as usize, BuildHasherDefault::<FnvHasher>::default());
 
-    add_pixel(Point {x: size_x / 2, y: size_y / 2}, colors.pop_front().unwrap(), &mut pixels, &mut active_pixels, size_x, size_y);
+    add_pixel(Point { x: size_x / 2, y: size_y / 2 }, colors.pop_front().unwrap(), &mut pixels, &mut active_pixels, size_x, size_y);
     create_image(&pixels, size_x, size_y, &directory, "img0");
 
     let mut color_distance_threshold = 2;
@@ -68,7 +68,7 @@ fn place_pixels(colors: &mut VecDeque<Color>, size_x: u32, size_y: u32, director
             colors_counter = 0;
             if (pixels.len() as u32 - 1) % image_interval == 0 {
                 println!("{}, {}, {}", colors.len(), active_pixels.len() - 1, color_distance_threshold);
-                create_image(&pixels, size_x, size_y, &directory, &format!("img{}",  i));
+                create_image(&pixels, size_x, size_y, &directory, &format!("img{}", i));
                 i += 1;
                 color_distance_threshold -= 1;
                 if color_distance_threshold < 2 {
@@ -92,7 +92,7 @@ fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color, Buil
     active_pixels.insert(point, color);
 
     let active_points_to_remove = active_pixels.iter()
-        .map(|(p,_)| p.clone())
+        .map(|(p, _)| p.clone())
         .filter(|p| free_neighbours(p, &pixels, size_x, size_y).len() == 0)
         .collect::<Vec<_>>();
     for p in &active_points_to_remove {
@@ -101,29 +101,29 @@ fn add_pixel(point: Point, color: Color, pixels: &mut HashMap<Point, Color, Buil
 }
 
 fn get_best_point(color: &Color, active_pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, color_distance_threshold: u32) -> Option<Point> {
-    active_pixels.iter().find(|&(_,c)| color_distance(color, c) < color_distance_threshold).map(|(p,_)| p.clone())
+    active_pixels.iter().find(|&(_, c)| color_distance(color, c) < color_distance_threshold).map(|(p, _)| p.clone())
 }
 
 fn free_neighbours(point: &Point, pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, size_x: u32, size_y: u32) -> Vec<Point> {
     let mut neighbours = vec![];
     if point.y > 0 {
-        neighbours.push(Point {x: point.x, y: point.y - 1});
+        neighbours.push(Point { x: point.x, y: point.y - 1 });
     }
     if point.x < size_x - 1 {
-        neighbours.push(Point {x: point.x + 1, y: point.y});
+        neighbours.push(Point { x: point.x + 1, y: point.y });
     }
     if point.y < size_y - 1 {
-        neighbours.push(Point {x: point.x, y: point.y + 1});
+        neighbours.push(Point { x: point.x, y: point.y + 1 });
     }
     if point.x > 0 {
-        neighbours.push(Point {x: point.x - 1, y: point.y});
+        neighbours.push(Point { x: point.x - 1, y: point.y });
     }
     neighbours.into_iter().filter(|p| !pixels.contains_key(p)).collect()
 }
 
 fn create_image(pixels: &HashMap<Point, Color, BuildHasherDefault<FnvHasher>>, size_x: u32, size_y: u32, directory: &str, filename: &str) {
     let mut img = RgbImage::new(size_x, size_y);
-    for (p,c) in pixels {
+    for (p, c) in pixels {
         img.put_pixel(p.x, p.y, Rgb::from_channels(c.r, c.g, c.b, 0));
     }
     let _ = img.save(format!("{}/{}.png", directory, filename));
